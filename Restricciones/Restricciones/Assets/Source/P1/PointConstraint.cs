@@ -95,10 +95,8 @@ public class PointConstraint : MonoBehaviour, IConstraint
         Vector3 posA = (bodyA != null) ? bodyA.PointLocalToGlobal(pointA) : pointA;
         Vector3 posB = (bodyB != null) ? bodyB.PointLocalToGlobal(pointB) : pointB;
 
-        float cx = (posA[0] - posB[0]);
-        float cy = (posA[1] - posB[1]);
-        float cz = (posA[2] - posB[2]);
-         c = Utils.ToVectorXD(new Vector3(cx, cy, cz));
+        VectorXD cv = Utils.ToVectorXD(posA - posB);
+        c.SetSubVector(index, 3, cv);
     }
 
     public void GetConstraintJacobian(MatrixXD dcdx)
@@ -113,16 +111,15 @@ public class PointConstraint : MonoBehaviour, IConstraint
         Vector3 posB = (bodyB != null) ? bodyB.PointLocalToGlobal(pointB) : pointB;
 
         // TO BE COMPLETED
-        float cx = (posA[0] - posB[0]);
-        float cy = (posA[1] - posB[1]);
-        float cz = (posA[2] - posB[2]);
-        VectorXD c = Utils.ToVectorXD(new Vector3(cx, cy, cz));
+        Vector3 c3 = posA - posB;
+        VectorXD c = Utils.ToVectorXD(c3);
+
         if (bodyA != null)
         {
             MatrixXD dcdxa = - Utils.Skew(posA - bodyA.m_pos);
 
-            VectorXD fax = -Stiffness * dcdxa.Transpose() * c;
-            VectorXD faTheta = -Stiffness * dcdxa.Transpose() * c;
+            VectorXD fax = -Stiffness *  c;
+            VectorXD faTheta = -Stiffness * (dcdxa.Transpose() * c);
         
             force.SetSubVector(bodyA.index, 3, force.SubVector(bodyA.index, 3) + fax);
             force.SetSubVector(bodyA.index + 3, 3, force.SubVector(bodyA.index + 3, 3) + faTheta);
@@ -130,10 +127,10 @@ public class PointConstraint : MonoBehaviour, IConstraint
 
         if (bodyB != null)
         {
-            MatrixXD dcdxb = -Utils.Skew(posB - bodyB.m_pos);
+            MatrixXD dcdxb = Utils.Skew(posB - bodyB.m_pos);
 
-            VectorXD fbx = -Stiffness * dcdxb.Transpose() * c;
-            VectorXD fbTheta = -Stiffness * dcdxb.Transpose() * c;
+            VectorXD fbx = Stiffness *  c;
+            VectorXD fbTheta = -Stiffness * (dcdxb.Transpose() * c);
 
             force.SetSubVector(bodyB.index, 3, force.SubVector(bodyB.index, 3) + fbx);
             force.SetSubVector(bodyB.index + 3, 3, force.SubVector(bodyB.index + 3, 3) + fbTheta);

@@ -168,7 +168,49 @@ public class PointConstraint : MonoBehaviour, IConstraint
     public void GetForceJacobian(MatrixXD dFdx, MatrixXD dFdv)
     {
         // TO BE COMPLETED
-        
+        MatrixXD I3 = DenseMatrixXD.CreateIdentity(3);
+
+        Vector3 posA = (bodyA != null) ? bodyA.PointLocalToGlobal(pointA) : pointA;
+        Vector3 posB = (bodyB != null) ? bodyB.PointLocalToGlobal(pointB) : pointB;
+
+        Vector3 rA = (bodyA != null) ? (posA - bodyA.m_pos) : Vector3.zero;
+        Vector3 rB = (bodyB != null) ? (posB - bodyB.m_pos) : Vector3.zero;
+
+        MatrixXD Ja = null, Jb = null;
+
+        if (bodyA != null)
+        {
+            Ja = new DenseMatrixXD(3, 6);
+            Ja.SetSubMatrix(0, 0, I3);
+            Ja.SetSubMatrix(0, 3, -Utils.Skew(rA));
+        }
+
+        if (bodyB != null)
+        {
+            Jb = new DenseMatrixXD(3, 6);
+            Jb.SetSubMatrix(0, 0, -I3);
+            Jb.SetSubMatrix(0, 3, Utils.Skew(rB));
+        }
+
+        if (bodyA != null)
+        {
+            MatrixXD Kaa = (-Stiffness) * (Ja.Transpose() * Ja);
+            AddBlock(dFdx, bodyA.index, bodyA.index, Kaa);
+        }
+
+        if (bodyA != null && bodyB != null)
+        {
+            MatrixXD Kab = (-Stiffness) * (Ja.Transpose() * Jb);
+            MatrixXD Kba = (-Stiffness) * (Jb.Transpose() * Ja);
+            AddBlock(dFdx, bodyA.index, bodyB.index, Kab);
+            AddBlock(dFdx, bodyB.index, bodyA.index, Kba);
+        }
+
+        if (bodyB != null)
+        {
+            MatrixXD Kbb = (-Stiffness) * (Jb.Transpose() * Jb);
+            AddBlock(dFdx, bodyB.index, bodyB.index, Kbb);
+        }
     }
 
     #endregion

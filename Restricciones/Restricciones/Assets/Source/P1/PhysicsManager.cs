@@ -156,10 +156,8 @@ public class PhysicsManager : MonoBehaviour
             obj.FixMatrix(Minv);
         }
 
-        // v_{n+1} = v_n + dt * a_n
         v += TimeStep * (Minv * f);
 
-        // x_{n+1} = x_n + dt * v_{n+1}
         x = TimeStep * v;
 
         foreach (ISimulable obj in m_objs)
@@ -210,8 +208,12 @@ public class PhysicsManager : MonoBehaviour
 
         MatrixXD dFdx = new DenseMatrixXD(m_numDoFs, m_numDoFs); dFdx.Clear();
         MatrixXD dFdv = new DenseMatrixXD(m_numDoFs, m_numDoFs); dFdv.Clear();
+        
         foreach (ISimulable obj in m_objs)
             obj.GetForceJacobian(dFdx, dFdv);
+
+        foreach (IConstraint constraint in m_constraints)
+            constraint.GetForceJacobian(dFdx, dFdv);
 
         foreach (ISimulable obj in m_objs)
         {
@@ -232,14 +234,15 @@ public class PhysicsManager : MonoBehaviour
         }
 
         VectorXD vNew = A.Solve(b);
-        VectorXD xNew = x + h * vNew;
+
+        VectorXD dx = h * vNew;
 
         foreach (ISimulable obj in m_objs)
         {
-            obj.SetPosition(xNew);
+            obj.AdvanceIncrementalPosition(dx);
             obj.SetVelocity(vNew);
         }
-}
+    }
 
     /// <summary>
     /// Performs a simulation step using Symplectic integration with constrained dynamics.
@@ -296,17 +299,12 @@ public class PhysicsManager : MonoBehaviour
             obj.FixMatrix(J);
         }
 
-        // Sistema:
-        // A λ = rhs
-        // A = J Minv J^T
-        // rhs = -( J v* + (beta/h) c )
+
         MatrixXD A = J * Minv * J.Transpose();
         double beta = 0.1;
         VectorXD rhs = -(J * vStar + (beta / h) * c);
         VectorXD lambda = A.Solve(rhs);
 
-        // Impulso/corrección de velocidad:
-        // Δv = Minv * J^T * λ
         VectorXD dv = Minv * (J.Transpose() * lambda);
 
         VectorXD vNew = vStar + dv;
@@ -314,11 +312,11 @@ public class PhysicsManager : MonoBehaviour
         foreach (ISimulable obj in m_objs)
             obj.FixVector(vNew);
 
-        VectorXD xNew = x + h * vNew;
+        VectorXD dx = h * vNew;
 
         foreach (ISimulable obj in m_objs)
         {
-            obj.SetPosition(xNew);
+            obj.AdvanceIncrementalPosition(dx);
             obj.SetVelocity(vNew);
         }
     }

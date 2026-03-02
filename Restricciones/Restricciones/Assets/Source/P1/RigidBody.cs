@@ -163,7 +163,23 @@ public class RigidBody : MonoBehaviour, ISimulable
     public void GetForceJacobian(MatrixXD dFdx, MatrixXD dFdv)
     {
         // TO BE COMPLETED
-     
+        MatrixXD I3 = DenseMatrixXD.CreateIdentity(3);
+
+        dFdv.SetSubMatrix(index, index,
+            dFdv.SubMatrix(index, 3, index, 3) + (-Damping * Mass) * I3);
+
+
+        VectorXD w = Utils.ToVectorXD(m_omega);
+        Vector3 Iw3 = Utils.ToVector3(m_inertia * w);
+
+        MatrixXD S_Iw = Utils.Skew(Iw3);
+        MatrixXD S_w = Utils.Skew(m_omega);
+
+        MatrixXD dtaudw = S_Iw - (S_w * m_inertia) - Damping * m_inertia;
+
+        dFdv.SetSubMatrix(index + 3, index + 3,
+            dFdv.SubMatrix(index + 3, 3, index + 3, 3) + dtaudw);
+
     }
 
     public void GetMass(MatrixXD mass)

@@ -175,7 +175,71 @@ public class PhysicsManager : MonoBehaviour
     private void stepImplicit()
     {
         // TO BE COMPLETED
-    }
+        double h = TimeStep;
+
+        VectorXD x = new DenseVectorXD(m_numDoFs);
+        VectorXD v = new DenseVectorXD(m_numDoFs);
+
+        foreach (ISimulable obj in m_objs)
+        {
+            obj.GetPosition(x);
+            obj.GetVelocity(v);
+        }
+
+
+
+        VectorXD f = new DenseVectorXD(m_numDoFs); f.Clear();
+        foreach (ISimulable obj in m_objs)
+            obj.GetForce(f);
+
+        foreach (IConstraint constraint in m_constraints)
+        {
+            constraint.GetForce(f);
+        }
+
+        MatrixXD Minv = new DenseMatrixXD(m_numDoFs);
+        Minv.Clear();
+        foreach (ISimulable obj in m_objs)
+            obj.GetMassInverse(Minv);
+
+        foreach (ISimulable obj in m_objs)
+        {
+            obj.FixVector(f);
+            obj.FixMatrix(Minv);
+        }
+
+        MatrixXD dFdx = new DenseMatrixXD(m_numDoFs, m_numDoFs); dFdx.Clear();
+        MatrixXD dFdv = new DenseMatrixXD(m_numDoFs, m_numDoFs); dFdv.Clear();
+        foreach (ISimulable obj in m_objs)
+            obj.GetForceJacobian(dFdx, dFdv);
+
+        foreach (ISimulable obj in m_objs)
+        {
+            obj.FixMatrix(dFdx);
+            obj.FixMatrix(dFdv);
+        }
+
+        MatrixXD I = DenseMatrixXD.CreateIdentity(m_numDoFs);
+
+        MatrixXD A = I - h * (Minv * dFdv) - (h * h) * (Minv * dFdx);
+
+        VectorXD b = (I - h * (Minv * dFdv)) * v + h * (Minv * f);
+
+        foreach (ISimulable obj in m_objs)
+        {
+            obj.FixMatrix(A);
+            obj.FixVector(b);
+        }
+
+        VectorXD vNew = A.Solve(b);
+        VectorXD xNew = x + h * vNew;
+
+        foreach (ISimulable obj in m_objs)
+        {
+            obj.SetPosition(xNew);
+            obj.SetVelocity(vNew);
+        }
+}
 
     /// <summary>
     /// Performs a simulation step using Symplectic integration with constrained dynamics.
@@ -184,6 +248,79 @@ public class PhysicsManager : MonoBehaviour
     private void stepSymplecticConstraints()
     {
         // TO BE COMPLETED
+        double h = TimeStep;
+        VectorXD x = new DenseVectorXD(m_numDoFs);
+        VectorXD v = new DenseVectorXD(m_numDoFs);
+
+        foreach (ISimulable obj in m_objs)
+        {
+            obj.GetPosition(x);
+            obj.GetVelocity(v);
+        }
+
+        VectorXD f = new DenseVectorXD(m_numDoFs);
+        f.Clear();
+        foreach (ISimulable obj in m_objs)
+            obj.GetForce(f);
+
+
+        MatrixXD Minv = new DenseMatrixXD(m_numDoFs, m_numDoFs);
+        Minv.Clear();
+        foreach (ISimulable obj in m_objs)
+            obj.GetMassInverse(Minv);
+
+        foreach (ISimulable obj in m_objs)
+        {
+            obj.FixVector(f);
+            obj.FixMatrix(Minv);
+        }
+
+        VectorXD vStar = v + h * (Minv * f);
+
+        foreach (ISimulable obj in m_objs)
+            obj.FixVector(vStar);
+
+        VectorXD c = new DenseVectorXD(m_numConstraints);
+        c.Clear();
+        foreach (IConstraint con in m_constraints)
+            con.GetConstraints(c);
+
+        MatrixXD J = new DenseMatrixXD(m_numConstraints, m_numDoFs);
+        J.Clear();
+        foreach (IConstraint con in m_constraints)
+            con.GetConstraintJacobian(J);
+
+        foreach (ISimulable obj in m_objs)
+        {
+            obj.FixVector(c);
+            obj.FixMatrix(J);
+        }
+
+        // Sistema:
+        // A λ = rhs
+        // A = J Minv J^T
+        // rhs = -( J v* + (beta/h) c )
+        MatrixXD A = J * Minv * J.Transpose();
+        double beta = 0.1;
+        VectorXD rhs = -(J * vStar + (beta / h) * c);
+        VectorXD lambda = A.Solve(rhs);
+
+        // Impulso/corrección de velocidad:
+        // Δv = Minv * J^T * λ
+        VectorXD dv = Minv * (J.Transpose() * lambda);
+
+        VectorXD vNew = vStar + dv;
+
+        foreach (ISimulable obj in m_objs)
+            obj.FixVector(vNew);
+
+        VectorXD xNew = x + h * vNew;
+
+        foreach (ISimulable obj in m_objs)
+        {
+            obj.SetPosition(xNew);
+            obj.SetVelocity(vNew);
+        }
     }
 
 }

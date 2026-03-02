@@ -99,9 +99,35 @@ public class PointConstraint : MonoBehaviour, IConstraint
         c.SetSubVector(index, 3, cv);
     }
 
+    private static void AddBlock(MatrixXD A, int r0, int c0, MatrixXD block3x3)
+    {
+        for (int r = 0; r < 3; r++)
+            for (int c = 0; c < 3; c++)
+                A[r0 + r, c0 + c] += block3x3[r, c];
+    }
     public void GetConstraintJacobian(MatrixXD dcdx)
     {
         // TO BE COMPLETED
+        int row = index;
+        Vector3 posA = (bodyA != null) ? bodyA.PointLocalToGlobal(pointA) : pointA;
+        Vector3 posB = (bodyB != null) ? bodyB.PointLocalToGlobal(pointB) : pointB;
+        MatrixXD I3 = DenseMatrixXD.CreateIdentity(3);
+
+        if (bodyA != null)
+        {
+            int colA = bodyA.index;
+            AddBlock(dcdx, row, colA, I3);
+            Vector3 rA = posA - bodyA.m_pos;
+            AddBlock(dcdx, row, colA + 3, -Utils.Skew(rA));
+        }
+
+        if (bodyB != null)
+        {
+            int colB = bodyB.index;
+            AddBlock(dcdx, row, colB, -I3);
+            Vector3 rB = posB - bodyB.m_pos;
+            AddBlock(dcdx, row, colB + 3, Utils.Skew(rB));
+        }
     }
 
     public void GetForce(VectorXD force)
@@ -142,6 +168,7 @@ public class PointConstraint : MonoBehaviour, IConstraint
     public void GetForceJacobian(MatrixXD dFdx, MatrixXD dFdv)
     {
         // TO BE COMPLETED
+        
     }
 
     #endregion

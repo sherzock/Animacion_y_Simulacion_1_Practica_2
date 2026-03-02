@@ -163,7 +163,7 @@ public class RigidBody : MonoBehaviour, ISimulable
     public void GetForceJacobian(MatrixXD dFdx, MatrixXD dFdv)
     {
         // TO BE COMPLETED
-
+     
     }
 
     public void GetMass(MatrixXD mass)
